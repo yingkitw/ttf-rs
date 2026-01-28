@@ -87,13 +87,15 @@ fn test_table_record() {
 
 #[test]
 fn test_font_modifier_api() {
+    use ttf_rs::FontModifier;
+
     // Test that FontModifier API exists
     let font_data = create_minimal_font_data();
     let result = Font::from_data(font_data.clone());
 
     match result {
         Ok(font) => {
-            let _modifier = font.into_modifier();
+            let _modifier = FontModifier::new(font);
             // If we get here, the modifier was created successfully
         }
         Err(_) => {
@@ -178,7 +180,7 @@ fn test_error_types() {
 
 #[test]
 fn test_glyph_data_variants() {
-    use ttf_rs::{SimpleGlyph, CompositeGlyph};
+    use ttf_rs::{GlyphData, SimpleGlyph, CompositeGlyph};
 
     // Test all variants can be created
     let simple = GlyphData::Simple(SimpleGlyph {
@@ -451,7 +453,8 @@ fn test_transform() {
 fn test_performance_checks() {
     use std::time::Instant;
 
-    let data = vec![0u8; 1024 * 1024]; // 1MB of data
+    // Use non-zero data to avoid checksum being 0
+    let data: Vec<u8> = (0..255).cycle().take(1024 * 1024).collect(); // 1MB of repeating pattern
     let now = Instant::now();
 
     // Test checksum performance
@@ -460,7 +463,7 @@ fn test_performance_checks() {
 
     // Should complete in reasonable time (< 100ms for 1MB)
     assert!(elapsed.as_millis() < 100, "Checksum calculation took too long: {:?}", elapsed);
-    assert_ne!(checksum, 0);
+    assert_ne!(checksum, 0, "Checksum should not be zero for non-zero data");
 }
 
 // Helper function to create minimal font data for testing

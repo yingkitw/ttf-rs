@@ -1,21 +1,7 @@
 // Working demonstration of ttf-rs capabilities
 // This example creates a minimal font and performs operations on it
 
-use ttf_rs::{Font, FontModifier, FontSubset, ValidationReport};
-use ttf_rs::stream::{FontWriter, FontReader};
-use ttf_rs::tables::{
-    TtfTable, TtfTableWrite,
-    head::HeadTable,
-    maxp::MaxpTable,
-    cmap::{CmapTable, CmapSubtable, Format4, EncodingRecord},
-    name::NameTable,
-    hhea::HheaTable,
-    hmtx::HmtxTable,
-    glyf::{GlyfTable, Glyph, GlyphData, SimpleGlyph},
-    loca::LocaTable,
-    post::PostTable,
-    os2::Os2Table,
-};
+use ttf_rs::{Font, FontModifier, FontSubset, ValidationReport, FontReader, FontWriter, GlyphData};
 use std::path::Path;
 
 fn create_minimal_font() -> Result<Font, Box<dyn std::error::Error>> {
@@ -132,7 +118,7 @@ fn demonstrate_font_operations(font: &Font) -> Result<(), Box<dyn std::error::Er
 fn demonstrate_font_modification(font: Font) -> Result<Font, Box<dyn std::error::Error>> {
     println!("=== Font Modification Demonstration ===\n");
 
-    let mut modifier = font.into_modifier();
+    let mut modifier = font.modify();
 
     println!("1. Creating modifier from font");
 
@@ -150,13 +136,13 @@ fn demonstrate_font_modification(font: Font) -> Result<Font, Box<dyn std::error:
     // modifier.set_font_name("Demo Font")?;
     // modifier.set_version(2, 0)?;
     // modifier.set_font_metrics(1000, -200, 0)?;
-    // let modified_font = modifier.build();
+    // let modified_font = modifier.commit()?;
 
     println!("2. Font modification API available");
     println!("   (Requires a font with writable tables for full functionality)\n");
 
     // Reconstruct font for next demo
-    let font = modifier.into_font();
+    let font = modifier.commit()?;
     Ok(font)
 }
 
@@ -166,7 +152,7 @@ fn demonstrate_font_subsetting(font: &Font) -> Result<(), Box<dyn std::error::Er
     println!("1. Creating font subset");
     println!("   Subset characters: A, B, C, 0, 1, 2");
 
-    let mut subset = font.subset();
+    let mut subset = font.clone().subset();
     match subset.with_chars(&['A', 'B', 'C', '0', '1', '2']) {
         Ok(_) => {}
         Err(_) => {
