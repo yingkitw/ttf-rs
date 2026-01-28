@@ -1,0 +1,16 @@
+[package]
+name = "ttf-rs"
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+description = "A Rust library for reading, writing, and operating on TTF (TrueType Font) files"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/ttf-rs"
+keywords = ["ttf", "font", "truetype", "opentype", "parser"]
+categories = ["parser-implementations", "encoding", "graphics"]
+
+[dependencies]
+thiserror = "2.0"
+
+[dev-dependencies]
+hex = "0.4"
