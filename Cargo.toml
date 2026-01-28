@@ -30,3 +30,4 @@ thiserror = "2.0"
 
 [dev-dependencies]
 hex = "0.4"
+tempfile = "3.13"
