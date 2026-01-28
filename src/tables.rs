@@ -10,6 +10,14 @@ pub mod glyf;
 pub mod loca;
 pub mod post;
 pub mod os2;
+pub mod kern;
+pub mod gpos;
+pub mod gsub;
+pub mod base;
+pub mod jstf;
+pub mod fpgm;
+pub mod prep;
+pub mod cvt;
 
 use crate::error::Result;
 use crate::stream::{FontReader, FontWriter};

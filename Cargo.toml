@@ -9,6 +9,18 @@ repository = "https://github.com/yourusername/ttf-rs"
 keywords = ["ttf", "font", "truetype", "opentype", "parser"]
 categories = ["parser-implementations", "encoding", "graphics"]
 
+[[bin]]
+name = "ttf-info"
+path = "src/bin/ttf_info.rs"
+
+[[bin]]
+name = "ttf-validate"
+path = "src/bin/ttf_validate.rs"
+
+[[bin]]
+name = "ttf-subset"
+path = "src/bin/ttf_subset.rs"
+
 [dependencies]
 thiserror = "2.0"
 

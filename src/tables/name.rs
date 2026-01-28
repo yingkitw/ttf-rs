@@ -1,6 +1,7 @@
 use crate::error::Result;
-use crate::stream::FontReader;
-use crate::tables::TtfTable;
+use crate::stream::{FontReader, FontWriter};
+use crate::tables::{TtfTable, TtfTableWrite};
+use std::collections::HashMap;
 
 /// NAME table - Naming table
 #[derive(Debug, Clone)]
@@ -9,6 +10,7 @@ pub struct NameTable {
     pub count: u16,
     pub string_offset: u16,
     pub name_records: Vec<NameRecord>,
+    pub string_data: HashMap<(u16, u16, u16, u16), Vec<u8>>, // (platform_id, encoding_id, language_id, name_id) -> string data
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +76,39 @@ impl NameTable {
             .iter()
             .find(|r| r.name_id == NameRecord::POSTSCRIPT_NAME)
     }
+
+    /// Set or update a name record with the given value
+    pub fn set_name(&mut self, name: &str, platform_id: u16, encoding_id: u16, language_id: u16, name_id: u16) {
+        // Encode the string
+        let name_bytes: Vec<u16> = name.encode_utf16().collect();
+        let mut name_data = Vec::new();
+        for code_unit in name_bytes {
+            name_data.extend_from_slice(&code_unit.to_be_bytes());
+        }
+
+        let key = (platform_id, encoding_id, language_id, name_id);
+        self.string_data.insert(key, name_data.clone());
+
+        // Remove existing record with same key
+        self.name_records.retain(|r| {
+            !(r.platform_id == platform_id
+                && r.encoding_id == encoding_id
+                && r.language_id == language_id
+                && r.name_id == name_id)
+        });
+
+        // Add new record
+        self.name_records.push(NameRecord {
+            platform_id,
+            encoding_id,
+            language_id,
+            name_id,
+            length: name_data.len() as u16,
+            offset: 0, // Will be calculated during write
+        });
+
+        self.count = self.name_records.len() as u16;
+    }
 }
 
 impl TtfTable for NameTable {
@@ -102,6 +137,52 @@ impl TtfTable for NameTable {
             count,
             string_offset,
             name_records,
+            string_data: HashMap::new(),
         })
+    }
+}
+
+impl TtfTableWrite for NameTable {
+    fn table_tag() -> &'static [u8; 4] {
+        b"name"
+    }
+
+    fn write(&self, writer: &mut FontWriter) -> Result<()> {
+        // Calculate string data size and offsets
+        let header_size = 6 + (self.name_records.len() * 12);
+        let mut current_offset = header_size as u16;
+        let mut all_string_data = Vec::new();
+
+        // First, collect all string data and update offsets
+        let mut updated_records = self.name_records.clone();
+        for record in &mut updated_records {
+            let key = (record.platform_id, record.encoding_id, record.language_id, record.name_id);
+            if let Some(data) = self.string_data.get(&key) {
+                record.offset = current_offset;
+                record.length = data.len() as u16;
+                all_string_data.extend_from_slice(data);
+                current_offset += data.len() as u16;
+            }
+        }
+
+        // Write header
+        writer.write_u16(self.format);
+        writer.write_u16(updated_records.len() as u16);
+        writer.write_u16(header_size as u16);
+
+        // Write name records
+        for record in &updated_records {
+            writer.write_u16(record.platform_id);
+            writer.write_u16(record.encoding_id);
+            writer.write_u16(record.language_id);
+            writer.write_u16(record.name_id);
+            writer.write_u16(record.length);
+            writer.write_u16(record.offset);
+        }
+
+        // Write string data
+        writer.write_bytes(&all_string_data);
+
+        Ok(())
     }
 }

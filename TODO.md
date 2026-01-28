@@ -53,12 +53,14 @@
 - [x] Set version string
 - [x] Set copyright notice
 - [x] Set trademark
-- [ ] Update font metrics (head, hhea, OS/2)
-- [ ] Modify glyph advance widths
-- [ ] Update font version and revision in head table
-- [ ] Modify embedding permissions
-- [ ] Add/update font names in multiple languages
-- [ ] Serialize modified tables back to font
+- [x] Update font metrics (head, hhea, OS/2)
+- [x] Modify glyph advance widths
+- [x] Update font version and revision in head table
+- [x] Modify embedding permissions
+- [x] Add/update font names in multiple languages
+- [x] Basic table serialization (name, head, hhea, OS/2, hmtx)
+- [ ] Full round-trip serialization with proper offset recalculation
+- [ ] Complete font rebuilding after modifications
 
 ### Additional cmap Formats
 - [ ] Format 6 - Trimmed table mapping
@@ -73,11 +75,16 @@
 - [ ] Composite glyph resolution
 
 ### Font Subsetting
-- [ ] Create subset with specified glyphs
-- [ ] Remap character codes
+- [x] Basic subsetting infrastructure (FontSubset struct)
+- [x] Add glyphs by ID
+- [x] Add glyphs by character
+- [x] Subset glyf table
+- [x] Subset loca table
+- [x] Subset hmtx table
+- [ ] Complete cmap table subsetting
 - [ ] Remove unused tables
 - [ ] Optimize subset size
-- [ ] Preserve font metrics
+- [ ] Full integration and testing
 
 ## Low Priority
 
@@ -158,8 +165,10 @@
 - [x] Basic examples (4 examples)
 - [x] README documentation
 - [x] Updated to Rust edition 2024
-- [x] Comprehensive test suite (37 tests passing)
-- [x] Font modification API (basic implementation)
+- [x] Comprehensive test suite (43 tests passing)
+- [x] Font modification API (comprehensive implementation)
+- [x] Font subsetting infrastructure (foundation complete)
+- [x] 5 working examples (basic, save_font, glyph_info, font_metrics, modify_font)
 
 ## Notes
 

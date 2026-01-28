@@ -1,6 +1,6 @@
 use crate::error::{Result, TtfError};
-use crate::stream::FontReader;
-use crate::tables::TtfTable;
+use crate::stream::{FontReader, FontWriter};
+use crate::tables::{TtfTable, TtfTableWrite};
 
 /// HEAD table - Font header
 #[derive(Debug, Clone)]
@@ -91,5 +91,32 @@ impl TtfTable for HeadTable {
             index_to_loc_format,
             glyph_data_format,
         })
+    }
+}
+
+impl TtfTableWrite for HeadTable {
+    fn table_tag() -> &'static [u8; 4] {
+        b"head"
+    }
+
+    fn write(&self, writer: &mut FontWriter) -> Result<()> {
+        writer.write_fixed(self.table_version);
+        writer.write_fixed(self.font_revision);
+        writer.write_u32(self.checksum_adjustment);
+        writer.write_u32(self.magic_number);
+        writer.write_u16(self.flags);
+        writer.write_u16(self.units_per_em);
+        writer.write_long_datetime(self.created);
+        writer.write_long_datetime(self.modified);
+        writer.write_i16(self.x_min);
+        writer.write_i16(self.y_min);
+        writer.write_i16(self.x_max);
+        writer.write_i16(self.y_max);
+        writer.write_u16(self.mac_style);
+        writer.write_u16(self.lowest_rec_ppem);
+        writer.write_i16(self.font_direction_hint);
+        writer.write_i16(self.index_to_loc_format);
+        writer.write_i16(self.glyph_data_format);
+        Ok(())
     }
 }

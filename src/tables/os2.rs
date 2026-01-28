@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::stream::FontReader;
-use crate::tables::TtfTable;
+use crate::stream::{FontReader, FontWriter};
+use crate::tables::{TtfTable, TtfTableWrite};
 
 /// OS/2 table - OS/2 and Windows metrics
 #[derive(Debug, Clone)]
@@ -180,5 +180,61 @@ impl TtfTable for Os2Table {
             us_break_char,
             us_max_context,
         })
+    }
+}
+
+impl TtfTableWrite for Os2Table {
+    fn table_tag() -> &'static [u8; 4] {
+        b"OS/2"
+    }
+
+    fn write(&self, writer: &mut FontWriter) -> Result<()> {
+        writer.write_u16(self.version);
+        writer.write_i16(self.x_avg_char_width);
+        writer.write_u16(self.us_weight_class);
+        writer.write_u16(self.us_width_class);
+        writer.write_u16(self.fs_type);
+        writer.write_i16(self.y_subscript_x_size);
+        writer.write_i16(self.y_subscript_y_size);
+        writer.write_i16(self.y_subscript_x_offset);
+        writer.write_i16(self.y_subscript_y_offset);
+        writer.write_i16(self.y_superscript_x_size);
+        writer.write_i16(self.y_superscript_y_size);
+        writer.write_i16(self.y_superscript_x_offset);
+        writer.write_i16(self.y_superscript_y_offset);
+        writer.write_i16(self.y_strikeout_size);
+        writer.write_i16(self.y_strikeout_position);
+        writer.write_i16(self.s_family_class);
+        for b in &self.panose {
+            writer.write_u8(*b);
+        }
+        writer.write_u32(self.ul_unicode_range1);
+        writer.write_u32(self.ul_unicode_range2);
+        writer.write_u32(self.ul_unicode_range3);
+        writer.write_u32(self.ul_unicode_range4);
+        for b in &self.ach_vend_id {
+            writer.write_u8(*b);
+        }
+        writer.write_u16(self.fs_selection);
+        writer.write_u16(self.us_first_char_index);
+        writer.write_u16(self.us_last_char_index);
+        writer.write_i16(self.s_typo_ascender);
+        writer.write_i16(self.s_typo_descender);
+        writer.write_i16(self.s_typo_line_gap);
+        writer.write_u16(self.us_win_ascent);
+        writer.write_u16(self.us_win_descent);
+        writer.write_u32(self.ul_code_page_range1);
+        writer.write_u32(self.ul_code_page_range2);
+
+        // Write version 1+ fields if applicable
+        if self.version >= Self::VERSION_1 {
+            writer.write_i16(self.sx_height);
+            writer.write_i16(self.s_cap_height);
+            writer.write_u16(self.us_default_char);
+            writer.write_u16(self.us_break_char);
+            writer.write_u16(self.us_max_context);
+        }
+
+        Ok(())
     }
 }

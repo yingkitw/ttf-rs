@@ -5,10 +5,14 @@ mod font;
 mod tables;
 mod stream;
 mod modifier;
+mod subset;
+mod validation;
 
 pub use error::{TtfError, Result};
 pub use font::Font;
 pub use modifier::FontModifier;
+pub use subset::FontSubset;
+pub use validation::{ValidationReport, ValidationError, ValidationWarning};
 pub use stream::{FontReader, FontWriter, calculate_checksum};
 pub use tables::{
     TableRecord,
@@ -20,7 +24,7 @@ pub use tables::{
     name::NameTable,
     hhea::HheaTable,
     hmtx::HmtxTable,
-    glyf::{GlyfTable, GlyphData},
+    glyf::{GlyfTable, GlyphData, Point, BoundingBox},
     loca::LocaTable,
     post::PostTable,
     os2::Os2Table,

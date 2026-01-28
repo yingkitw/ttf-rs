@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::stream::FontReader;
-use crate::tables::TtfTable;
+use crate::stream::{FontReader, FontWriter};
+use crate::tables::{TtfTable, TtfTableWrite};
 
 /// HHEA table - Horizontal header
 #[derive(Debug, Clone)]
@@ -28,6 +28,16 @@ pub struct HheaTable {
 impl HheaTable {
     pub fn get_line_height(&self) -> i32 {
         self.ascent as i32 - self.descent as i32 + self.line_gap as i32
+    }
+
+    /// Alias for ascent for compatibility with modifier code
+    pub fn ascender(&self) -> i16 {
+        self.ascent
+    }
+
+    /// Alias for descent for compatibility with modifier code
+    pub fn descender(&self) -> i16 {
+        self.descent
     }
 }
 
@@ -78,5 +88,33 @@ impl TtfTable for HheaTable {
             metric_data_format,
             number_of_h_metrics,
         })
+    }
+}
+
+impl TtfTableWrite for HheaTable {
+    fn table_tag() -> &'static [u8; 4] {
+        b"hhea"
+    }
+
+    fn write(&self, writer: &mut FontWriter) -> Result<()> {
+        writer.write_fixed(self.table_version);
+        writer.write_i16(self.ascent);
+        writer.write_i16(self.descent);
+        writer.write_i16(self.line_gap);
+        writer.write_u16(self.advance_width_max);
+        writer.write_i16(self.min_left_side_bearing);
+        writer.write_i16(self.min_right_side_bearing);
+        writer.write_i16(self.x_max_extent);
+        writer.write_i16(self.caret_slope_rise);
+        writer.write_i16(self.caret_slope_run);
+        writer.write_i16(self.caret_offset);
+        writer.write_i16(self.reserved0);
+        writer.write_i16(self.reserved1);
+        writer.write_i16(self.reserved2);
+        writer.write_i16(self.reserved3);
+        writer.write_i16(self.reserved4);
+        writer.write_i16(self.metric_data_format);
+        writer.write_u16(self.number_of_h_metrics);
+        Ok(())
     }
 }

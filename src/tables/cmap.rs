@@ -23,6 +23,8 @@ pub enum CmapSubtable {
     Format4(Format4),
     Format6(Format6),
     Format12(Format12),
+    Format13(Format13),
+    Format14(Format14),
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +75,42 @@ pub struct SequentialMapGroup {
     pub end_char_code: u32,
     pub start_glyph_code: u32,
 }
+
+/// Format 13 - Many-to-one range mappings
+#[derive(Debug, Clone)]
+pub struct Format13 {
+    pub format: u32,
+    pub length: u32,
+    pub language: u32,
+    pub groups: Vec<ConstantMapGroup>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstantMapGroup {
+    pub start_char_code: u32,
+    pub end_char_code: u32,
+    pub glyph_code: u32,
+}
+
+/// Format 14 - Unicode variation sequences
+#[derive(Debug, Clone)]
+pub struct Format14 {
+    pub format: u32,
+    pub length: u32,
+    pub num_var_selector_records: u32,
+    pub var_selector_records: Vec<VarSelectorRecord>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VarSelectorRecord {
+    pub var_selector: U24,
+    pub default_uvsoffset: u32,
+    pub non_default_uvsoffset: u32,
+}
+
+/// U24 is a 3-byte unsigned integer
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct U24(pub u32);
 
 impl Format0 {
     pub fn get_glyph(&self, char_code: u8) -> Option<u16> {
@@ -153,7 +191,7 @@ impl Format12 {
     pub fn get_glyph(&self, char_code: u32) -> Option<u32> {
         // Binary search through groups
         let mut min = 0;
-        let mut max = self.groups.len() - 1;
+        let mut max = self.groups.len().saturating_sub(1);
 
         while min <= max {
             let mid = (min + max) / 2;
@@ -169,6 +207,33 @@ impl Format12 {
             } else {
                 // char_code is within this group
                 return Some(group.start_glyph_code + (char_code - group.start_char_code));
+            }
+        }
+
+        None
+    }
+}
+
+impl Format13 {
+    pub fn get_glyph(&self, char_code: u32) -> Option<u32> {
+        // Binary search through groups (all map to same glyph)
+        let mut min = 0;
+        let mut max = self.groups.len().saturating_sub(1);
+
+        while min <= max {
+            let mid = (min + max) / 2;
+            let group = &self.groups[mid];
+
+            if char_code < group.start_char_code {
+                if mid == 0 {
+                    return None;
+                }
+                max = mid - 1;
+            } else if char_code > group.end_char_code {
+                min = mid + 1;
+            } else {
+                // char_code is within this group, all map to the same glyph
+                return Some(group.glyph_code);
             }
         }
 
@@ -207,7 +272,9 @@ impl CmapTable {
                     f.get_glyph(code as u8).map(|g| g as u32)
                 }
                 CmapSubtable::Format4(f) if code <= 0xFFFF => f.get_glyph(code as u16).map(|g| g as u32),
+                CmapSubtable::Format6(f) if code <= 0xFFFF => f.get_glyph(code as u16).map(|g| g as u32),
                 CmapSubtable::Format12(f) => f.get_glyph(code),
+                CmapSubtable::Format13(f) => f.get_glyph(code),
                 _ => None,
             }
         } else {
@@ -306,6 +373,95 @@ impl TtfTable for CmapTable {
                         id_deltas,
                         id_range_offsets,
                         glyph_id_array,
+                    })
+                }
+                6 => {
+                    // Format 6 - Trimmed table mapping
+                    let length = reader.read_u16()?;
+                    let language = reader.read_u16()?;
+                    let first_code = reader.read_u16()?;
+                    let entry_count = reader.read_u16()?;
+
+                    let mut glyph_id_array = Vec::with_capacity(entry_count as usize);
+                    for _ in 0..entry_count {
+                        glyph_id_array.push(reader.read_u16()?);
+                    }
+
+                    CmapSubtable::Format6(Format6 {
+                        format,
+                        length,
+                        language,
+                        first_code,
+                        entry_count,
+                        glyph_id_array,
+                    })
+                }
+                12 => {
+                    // Format 12 - Segmented coverage (full Unicode)
+                    reader.skip(2)?; // format is already read, but it's u16 in the stream for formats < 8
+                    let length = reader.read_u32()?;
+                    let language = reader.read_u32()?;
+                    let num_groups = reader.read_u32()?;
+
+                    let mut groups = Vec::with_capacity(num_groups as usize);
+                    for _ in 0..num_groups {
+                        groups.push(SequentialMapGroup {
+                            start_char_code: reader.read_u32()?,
+                            end_char_code: reader.read_u32()?,
+                            start_glyph_code: reader.read_u32()?,
+                        });
+                    }
+
+                    CmapSubtable::Format12(Format12 {
+                        format: 12,
+                        length,
+                        language,
+                        groups,
+                    })
+                }
+                13 => {
+                    // Format 13 - Many-to-one range mappings
+                    reader.skip(2)?;
+                    let length = reader.read_u32()?;
+                    let language = reader.read_u32()?;
+                    let num_groups = reader.read_u32()?;
+
+                    let mut groups = Vec::with_capacity(num_groups as usize);
+                    for _ in 0..num_groups {
+                        groups.push(ConstantMapGroup {
+                            start_char_code: reader.read_u32()?,
+                            end_char_code: reader.read_u32()?,
+                            glyph_code: reader.read_u32()?,
+                        });
+                    }
+
+                    CmapSubtable::Format13(Format13 {
+                        format: 13,
+                        length,
+                        language,
+                        groups,
+                    })
+                }
+                14 => {
+                    // Format 14 - Unicode variation sequences
+                    reader.skip(2)?;
+                    let length = reader.read_u32()?;
+                    let num_var_selector_records = reader.read_u32()?;
+
+                    let mut var_selector_records = Vec::with_capacity(num_var_selector_records as usize);
+                    for _ in 0..num_var_selector_records {
+                        var_selector_records.push(VarSelectorRecord {
+                            var_selector: U24(reader.read_u24()?),
+                            default_uvsoffset: reader.read_u32()?,
+                            non_default_uvsoffset: reader.read_u32()?,
+                        });
+                    }
+
+                    CmapSubtable::Format14(Format14 {
+                        format: 14,
+                        length,
+                        num_var_selector_records,
+                        var_selector_records,
                     })
                 }
                 _ => {

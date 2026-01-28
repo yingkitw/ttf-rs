@@ -1,5 +1,6 @@
 use crate::error::Result;
-use crate::stream::FontReader;
+use crate::stream::{FontReader, FontWriter};
+use crate::tables::TtfTableWrite;
 
 /// HMTX table - Horizontal metrics
 #[derive(Debug, Clone)]
@@ -57,5 +58,31 @@ impl HmtxTable {
                 0
             }
         }
+    }
+
+    /// Get all advance widths as a vector (for compatibility with modifier)
+    pub fn advance_widths(&self) -> Vec<u16> {
+        self.h_metrics.iter().map(|m| m.advance_width).collect()
+    }
+}
+
+impl TtfTableWrite for HmtxTable {
+    fn table_tag() -> &'static [u8; 4] {
+        b"hmtx"
+    }
+
+    fn write(&self, writer: &mut FontWriter) -> Result<()> {
+        // Write h_metrics
+        for metric in &self.h_metrics {
+            writer.write_u16(metric.advance_width);
+            writer.write_i16(metric.lsb);
+        }
+
+        // Write left_side_bearings
+        for &lsb in &self.left_side_bearings {
+            writer.write_i16(lsb);
+        }
+
+        Ok(())
     }
 }
