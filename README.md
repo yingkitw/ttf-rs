@@ -2,6 +2,16 @@
 
 A comprehensive Rust library for reading, writing, and operating on TTF (TrueType Font) files.
 
+## Why ttf-rs?
+
+**Pure Rust Implementation**: Unlike many font libraries that rely on C bindings, ttf-rs is written entirely in Rust, giving you memory safety, thread safety, and easy cross-compilation without external dependencies.
+
+**Read AND Write**: Most TTF parsers only read fonts. ttf-rs supports both reading and writing, enabling you to modify font files, create custom fonts, and build font tooling entirely in Rust.
+
+**Production Ready**: With comprehensive table support (head, maxp, cmap, name, hhea, hmtx, glyf, loca, post, OS/2), robust error handling, and full test coverage, ttf-rs is suitable for production applications like font converters, web font optimizers, and custom text renderers.
+
+**Flexible**: Whether you're building a font inspector, a subset generator for web fonts, a custom text layout engine, or font modification tools, ttf-rs provides the building blocks you need.
+
 ## Features
 
 ### Reading TTF Files
@@ -38,7 +48,7 @@ ttf-rs = "0.1.0"
 
 ## Usage
 
-### Loading a Font
+### Basic Font Loading
 
 ```rust
 use ttf_rs::Font;
@@ -46,32 +56,14 @@ use ttf_rs::Font;
 // Load a font from a file
 let font = Font::load("path/to/font.ttf")?;
 
-// Or load from bytes
-let data = std::fs::read("path/to/font.ttf")?;
-let font = Font::from_data(data)?;
-```
-
-### Reading Font Information
-
-```rust
-use ttf_rs::Font;
-
-let font = Font::load("font.ttf")?;
-
-// Get header information
+// Get basic font metrics
 let head = font.head_table()?;
-println!("Units per EM: {}", head.units_per_em);
 println!("Font Revision: {}", head.font_revision);
+println!("Units per EM: {}", head.units_per_em);
 
-// Get maximum profile
+// Get glyph count
 let maxp = font.maxp_table()?;
-println!("Number of glyphs: {}", maxp.num_glyphs);
-
-// Get horizontal header
-let hhea = font.hhea_table()?;
-println!("Ascent: {}", hhea.ascent);
-println!("Descent: {}", hhea.descent);
-println!("Line Height: {}", hhea.get_line_height());
+println!("Total glyphs: {}", maxp.num_glyphs);
 ```
 
 ### Character to Glyph Mapping
@@ -81,47 +73,30 @@ use ttf_rs::Font;
 
 let font = Font::load("font.ttf")?;
 
-// Map a character to a glyph index
+// Map a character to its glyph index
 let glyph_index = font.char_to_glyph('A')?;
-println!("Glyph index for 'A': {}", glyph_index);
+println!("'A' is glyph index {}", glyph_index);
 
-// Or use the cmap table directly
-let cmap = font.cmap_table()?;
-if let Some(glyph) = cmap.map_char('A') {
-    println!("Glyph index for 'A': {}", glyph);
-}
+// Get horizontal metrics for a glyph
+let hmtx = font.hmtx_table()?;
+let (advance, lsb) = hmtx.get_horizontal_metrics(glyph_index);
+println!("Advance width: {}, LSB: {}", advance, lsb);
 ```
 
-### Listing Tables
+### Inspecting Glyphs
 
 ```rust
 use ttf_rs::Font;
 
 let font = Font::load("font.ttf")?;
-
-// List all tables in the font
-for table in font.list_tables() {
-    println!("Table: {}", table);
-}
-```
-
-### Reading Glyph Data
-
-```rust
-use ttf_rs::Font;
-
-let font = Font::load("font.ttf")?;
-
-// Get the glyf table
 let glyf = font.glyf_table()?;
 
-// Access a specific glyph
-if let Some(glyph) = glyf.get_glyph(0) {
-    println!("Glyph has {} contours", glyph.number_of_contours);
-
+// Get a glyph by index
+if let Some(glyph) = glyf.get_glyph(glyph_index) {
     match &glyph.data {
         ttf_rs::tables::glyf::GlyphData::Simple(simple) => {
-            println!("Simple glyph with {} points",
+            println!("Simple glyph with {} contours and {} points",
+                     glyph.number_of_contours,
                      simple.x_coordinates.len());
         }
         ttf_rs::tables::glyf::GlyphData::Composite(composite) => {
@@ -129,64 +104,158 @@ if let Some(glyph) = glyf.get_glyph(0) {
                      composite.components.len());
         }
         ttf_rs::tables::glyf::GlyphData::Empty => {
-            println!("Empty glyph");
+            println!("Empty glyph (whitespace)");
         }
     }
 }
 ```
 
-### Saving a Font
+### Font Metrics for Text Layout
 
 ```rust
 use ttf_rs::Font;
 
 let font = Font::load("font.ttf")?;
 
-// Save to a new file
+// Get vertical metrics for line spacing
+let hhea = font.hhea_table()?;
+let line_gap = hhea.line_gap;
+let line_height = hhea.get_line_height();
+println!("Line height: {} (ascent: {} + descent: {} + gap: {})",
+         line_height, hhea.ascent, hhea.descent, line_gap);
+
+// Get OS/2 metrics for more precise spacing
+if let Some(os2) = font.os2_table() {
+    println!("Typo Ascender: {}", os2.typo_ascender);
+    println!("Typo Descender: {}", os2.typo_descender);
+    println!("X-Height: {}", os2.x_height);
+    println!("Cap Height: {}", os2.cap_height);
+}
+```
+
+### Saving Modified Fonts
+
+```rust
+use ttf_rs::Font;
+
+let font = Font::load("font.ttf")?;
+
+// After any modifications, save the font
 font.save("output.ttf")?;
 
-// Or get raw bytes
+// Or get the raw bytes
 let bytes = font.to_bytes()?;
 std::fs::write("output.ttf", bytes)?;
 ```
 
-### Binary Utilities
-
-The library also provides low-level binary reading/writing utilities:
-
-```rust
-use ttf_rs::{FontReader, FontWriter, calculate_checksum};
-
-// Reading binary data
-let mut reader = FontReader::new(data);
-let value = reader.read_u32()?;
-let fixed = reader.read_fixed()?;
-
-// Writing binary data
-let mut writer = FontWriter::new();
-writer.write_u32(0x10000);
-writer.write_fixed(1.5);
-
-// Calculate TTF checksums
-let checksum = calculate_checksum(&table_data);
-```
-
 ## Examples
 
-The library includes several examples demonstrating different features:
+The library includes comprehensive examples demonstrating real-world usage:
 
 ```bash
-# Basic font information
+# Basic font information and inspection
 cargo run --example basic
 
-# Save and round-trip a font
-cargo run --example save_font
+# Character to glyph mapping demonstration
+cargo run --example character_mapping
 
-# Detailed glyph information
+# Detailed glyph information (simple and composite)
 cargo run --example glyph_info
 
-# Comprehensive font metrics
+# Glyph metrics for text layout
+cargo run --example glyph_metrics
+
+# Comprehensive font metrics display
 cargo run --example font_metrics
+
+# Table inspector - list all font tables
+cargo run --example table_inspector
+
+# Save and round-trip a font file
+cargo run --example save_font
+
+# Modify font properties
+cargo run --example modify_font
+
+# Complete feature demonstration
+cargo run --example comprehensive
+
+# Interactive demo
+cargo run --example demo
+```
+
+### Example: Font Metrics Calculator
+
+```rust
+use ttf_rs::Font;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let font = Font::load("font.ttf")?;
+
+    // Get essential metrics for text layout
+    let hhea = font.hhea_table()?;
+    let head = font.head_table()?;
+    let os2 = font.os2_table()?;
+
+    println!("Font Metrics for Text Layout:");
+    println!("  Ascent: {}", hhea.ascent);
+    println!("  Descent: {}", hhea.descent);
+    println!("  Line Gap: {}", hhea.line_gap);
+    println!("  Line Height: {}", hhea.get_line_height());
+    println!("  Units per EM: {}", head.units_per_em);
+
+    if let Some(os2) = os2 {
+        println!("  X-Height: {}", os2.x_height);
+        println!("  Cap Height: {}", os2.cap_height);
+    }
+
+    Ok(())
+}
+```
+
+### Example: Character Mapping
+
+```rust
+use ttf_rs::Font;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let font = Font::load("font.ttf")?;
+    let text = "Hello";
+
+    println!("Mapping characters to glyphs:");
+    for ch in text.chars() {
+        if let Ok(glyph_index) = font.char_to_glyph(ch) {
+            println!("  '{}' -> glyph {}", ch, glyph_index);
+        }
+    }
+
+    Ok(())
+}
+```
+
+### Example: Font Inspector
+
+```rust
+use ttf_rs::Font;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let font = Font::load("font.ttf")?;
+
+    println!("Font Tables:");
+    for table in font.list_tables() {
+        println!("  - {}", table);
+    }
+
+    println!("\nGlyph Count: {}", font.maxp_table()?.num_glyphs);
+
+    if let Some(name) = font.name_table() {
+        if let Some(family) = name.get_font_family() {
+            println!("Font Family: {}", family);
+        }
+    }
+
+    Ok(())
+}
 ```
 
 ## Project Structure
