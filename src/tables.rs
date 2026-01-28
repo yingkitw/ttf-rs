@@ -18,6 +18,16 @@ pub mod jstf;
 pub mod fpgm;
 pub mod prep;
 pub mod cvt;
+pub mod fvar;
+pub mod gvar;
+pub mod avar;
+pub mod stat;
+pub mod hvar;
+pub mod colr;
+pub mod cpal;
+pub mod svg;
+pub mod cbdt;
+pub mod sbix;
 
 use crate::error::Result;
 use crate::stream::{FontReader, FontWriter};

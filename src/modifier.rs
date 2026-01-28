@@ -1,3 +1,26 @@
+//! Font modification API for updating font metadata and metrics.
+//!
+//! This module provides a builder-style API for modifying various aspects
+//! of TrueType fonts, including metadata (names, copyright), metrics
+//! (ascent, descent, advance widths), and embedding permissions.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use ttf_rs::Font;
+//!
+//! let font = Font::load("input.ttf")?;
+//! let mut modifier = font.modify();
+//!
+//! modifier.set_font_name("My Custom Font")?;
+//! modifier.set_version(2, 0)?;
+//! modifier.set_font_metrics(2048, 1638, -410, 204)?;
+//!
+//! let modified_font = modifier.commit()?;
+//! modified_font.save("output.ttf")?;
+//! # Ok::<(), ttf_rs::TtfError>(())
+//! ```
+
 use crate::error::Result;
 use crate::font::Font;
 use crate::stream::FontWriter;
@@ -9,7 +32,17 @@ use crate::tables::hmtx::HmtxTable;
 use crate::tables::TtfTableWrite;
 use std::collections::HashMap;
 
-/// FontModifier allows for modifying font properties before saving
+/// Font modifier for updating font properties.
+///
+/// Provides a builder-style API for modifying font metadata, metrics,
+/// and other properties. Changes are tracked internally and applied
+/// when `commit()` is called.
+///
+/// # Note
+///
+/// Full round-trip serialization with proper offset recalculation is
+/// currently in development. Some modifications may not persist correctly
+/// when saving and reloading the font.
 pub struct FontModifier {
     font: Font,
     modified_tables: HashMap<[u8; 4], Vec<u8>>,
@@ -23,7 +56,23 @@ impl FontModifier {
         }
     }
 
-    /// Set the font family name (name ID 1)
+    /// Set font family name (name ID 1).
+    ///
+    /// Updates the font family name in the name table.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The new font family name
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use ttf_rs::Font;
+    /// let font = Font::load("font.ttf")?;
+    /// let mut modifier = font.modify();
+    /// modifier.set_font_name("My Font Family")?;
+    /// # Ok::<(), ttf_rs::TtfError>(())
+    /// ```
     pub fn set_font_name(&mut self, name: &str) -> Result<&mut Self> {
         let mut name_table = self.font.name_table()?;
 
@@ -37,7 +86,13 @@ impl FontModifier {
         Ok(self)
     }
 
-    /// Set the full font name (name ID 4)
+    /// Set full font name (name ID 4).
+    ///
+    /// Updates the full font name (family + style) in the name table.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The new full font name
     pub fn set_full_font_name(&mut self, name: &str) -> Result<&mut Self> {
         let mut name_table = self.font.name_table()?;
 
@@ -51,7 +106,24 @@ impl FontModifier {
         Ok(self)
     }
 
-    /// Set version string (name ID 5)
+    /// Set version string (name ID 5).
+    ///
+    /// Updates the version string in the name table and font revision in head table.
+    ///
+    /// # Arguments
+    ///
+    /// * `major` - Major version number
+    /// * `minor` - Minor version number
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use ttf_rs::Font;
+    /// let font = Font::load("font.ttf")?;
+    /// let mut modifier = font.modify();
+    /// modifier.set_version(2, 0)?;
+    /// # Ok::<(), ttf_rs::TtfError>(())
+    /// ```
     pub fn set_version(&mut self, major: u16, minor: u16) -> Result<&mut Self> {
         let version_string = format!("Version {}.{}", major, minor);
 
@@ -73,7 +145,13 @@ impl FontModifier {
         Ok(self)
     }
 
-    /// Set copyright notice (name ID 0)
+    /// Set copyright notice (name ID 0).
+    ///
+    /// Updates the copyright notice in the name table.
+    ///
+    /// # Arguments
+    ///
+    /// * `copyright` - The copyright notice text
     pub fn set_copyright(&mut self, copyright: &str) -> Result<&mut Self> {
         let mut name_table = self.font.name_table()?;
 
@@ -87,7 +165,13 @@ impl FontModifier {
         Ok(self)
     }
 
-    /// Set trademark (name ID 7)
+    /// Set trademark notice (name ID 7).
+    ///
+    /// Updates the trademark notice in the name table.
+    ///
+    /// # Arguments
+    ///
+    /// * `trademark` - The trademark notice text
     pub fn set_trademark(&mut self, trademark: &str) -> Result<&mut Self> {
         let mut name_table = self.font.name_table()?;
 
@@ -101,7 +185,14 @@ impl FontModifier {
         Ok(self)
     }
 
-    /// Update font version and revision in head table
+    /// Update font version and revision in head table.
+    ///
+    /// Sets the font revision number in the head table.
+    ///
+    /// # Arguments
+    ///
+    /// * `major` - Major version number
+    /// * `minor` - Minor version number (0-99)
     pub fn set_font_revision(&mut self, major: u16, minor: u16) -> Result<&mut Self> {
         let mut head_table = self.font.head_table()?;
         head_table.font_revision = (major as f32) + (minor as f32) / 100.0;

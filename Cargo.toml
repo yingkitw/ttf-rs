@@ -21,6 +21,10 @@ path = "src/bin/ttf_validate.rs"
 name = "ttf-subset"
 path = "src/bin/ttf_subset.rs"
 
+[[bin]]
+name = "ttf-metrics"
+path = "src/bin/ttf_metrics.rs"
+
 [dependencies]
 thiserror = "2.0"
 

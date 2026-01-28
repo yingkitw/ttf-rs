@@ -17,15 +17,39 @@ use crate::tables::loca::LocaTable;
 use crate::tables::post::PostTable;
 use crate::tables::os2::Os2Table;
 
-/// Main Font structure representing a TrueType font
+/// Main Font structure representing a TrueType font.
+///
+/// This structure holds the parsed representation of a TrueType font file,
+/// including the SFNT header information, table directory, and raw font data.
+///
+/// # Examples
+///
+/// ```no_run
+/// use ttf_rs::Font;
+///
+/// // Load a font from a file
+/// let font = Font::load("path/to/font.ttf")?;
+///
+/// // Get font metrics
+/// let units_per_em = font.units_per_em()?;
+/// let num_glyphs = font.num_glyphs()?;
+/// # Ok::<(), ttf_rs::TtfError>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct Font {
+    /// SFNT version identifier (0x00010000 for TrueType, 0x4F54544F for OpenType)
     pub sfnt_version: u32,
+    /// Number of tables in the font
     pub num_tables: u16,
+    /// Search range for binary search (maximum power of 2 <= num_tables) * 16
     pub search_range: u16,
+    /// Entry selector for binary search: log2(maximum power of 2 <= num_tables)
     pub entry_selector: u16,
+    /// Range shift: num_tables * 16 - search_range
     pub range_shift: u16,
+    /// Table directory records containing metadata for each table
     pub table_records: Vec<TableRecord>,
+    /// Raw font data bytes
     pub data: Vec<u8>,
 }
 
@@ -33,7 +57,27 @@ impl Font {
     const SFNT_TRUETYPE: u32 = 0x00010000;
     const SFNT_OPENTYPE: u32 = 0x4F54544F; // 'OTTO'
 
-    /// Load a font from a file path
+    /// Load a font from a file path.
+    ///
+    /// Reads the entire font file into memory and parses the SFNT structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the TrueType font file
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Font` instance on success, or a `TtfError` if the file cannot
+    /// be read or parsed.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ttf_rs::Font;
+    ///
+    /// let font = Font::load("path/to/font.ttf")?;
+    /// # Ok::<(), ttf_rs::TtfError>(())
+    /// ```
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = File::open(path)?;
         let metadata = file.metadata()?;
@@ -45,7 +89,29 @@ impl Font {
         Self::from_data(data)
     }
 
-    /// Load a font from raw bytes
+    /// Load a font from raw bytes.
+    ///
+    /// Parses a TrueType font from a byte vector. The data should contain
+    /// a complete TrueType font file starting with the SFNT header.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Raw font file data as a byte vector
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Font` instance on success, or a `TtfError` if the data
+    /// cannot be parsed as a valid TrueType font.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ttf_rs::Font;
+    ///
+    /// let font_data = std::fs::read("path/to/font.ttf")?;
+    /// let font = Font::from_data(font_data)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn from_data(data: Vec<u8>) -> Result<Self> {
         let mut reader = FontReader::new(data);
 
@@ -83,7 +149,17 @@ impl Font {
         })
     }
 
-    /// Get a table record by tag
+    /// Get a table record by tag.
+    ///
+    /// Searches for a table with the specified 4-byte tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag` - 4-byte table identifier (e.g., b"head", b"name")
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(&TableRecord)` if found, `None` otherwise.
     pub fn get_table_record(&self, tag: &[u8; 4]) -> Option<&TableRecord> {
         self.table_records
             .iter()
@@ -103,7 +179,14 @@ impl Font {
         Some(self.data[start..end].to_vec())
     }
 
-    /// Parse and return the head table
+    /// Get the head table (font header).
+    ///
+    /// The head table contains global font information including
+    /// font revision, units per EM, bounding box, and index format.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `HeadTable` or an error if the table is missing or invalid.
     pub fn head_table(&self) -> Result<HeadTable> {
         let record = self
             .get_table_record(b"head")
@@ -115,7 +198,14 @@ impl Font {
         HeadTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the maxp table
+    /// Get the maxp table (maximum profile).
+    ///
+    /// The maxp table contains information about the maximum values
+    /// used in the font, such as the number of glyphs and points.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `MaxpTable` or an error if the table is missing or invalid.
     pub fn maxp_table(&self) -> Result<MaxpTable> {
         let record = self
             .get_table_record(b"maxp")
@@ -127,7 +217,13 @@ impl Font {
         MaxpTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the cmap table
+    /// Get the cmap table (character to glyph mapping).
+    ///
+    /// The cmap table maps Unicode characters to glyph indices.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `CmapTable` or an error if the table is missing or invalid.
     pub fn cmap_table(&self) -> Result<CmapTable> {
         let record = self
             .get_table_record(b"cmap")
@@ -140,7 +236,14 @@ impl Font {
         CmapTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the name table
+    /// Get the name table (font naming information).
+    ///
+    /// The name table contains information about the font's name,
+    /// including the family name, style name, and full name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `NameTable` or an error if the table is missing or invalid.
     pub fn name_table(&self) -> Result<NameTable> {
         let record = self
             .get_table_record(b"name")
@@ -152,7 +255,14 @@ impl Font {
         NameTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the hhea table
+    /// Get the hhea table (horizontal header).
+    ///
+    /// The hhea table contains information about the font's horizontal
+    /// metrics, including the ascent, descent, and line gap.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `HheaTable` or an error if the table is missing or invalid.
     pub fn hhea_table(&self) -> Result<HheaTable> {
         let record = self
             .get_table_record(b"hhea")
@@ -164,7 +274,14 @@ impl Font {
         HheaTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the hmtx table
+    /// Get the hmtx table (horizontal metrics).
+    ///
+    /// The hmtx table contains information about the font's horizontal
+    /// metrics for each glyph, including the advance width and left side bearing.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `HmtxTable` or an error if the table is missing or invalid.
     pub fn hmtx_table(&self) -> Result<HmtxTable> {
         let record = self
             .get_table_record(b"hmtx")
@@ -180,7 +297,14 @@ impl Font {
         HmtxTable::from_reader(&mut reader, record.length, maxp.num_glyphs, hhea.number_of_h_metrics)
     }
 
-    /// Parse and return the loca table
+    /// Get the loca table (glyph location).
+    ///
+    /// The loca table contains information about the location of each glyph
+    /// in the font, including the offset and length of each glyph.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `LocaTable` or an error if the table is missing or invalid.
     pub fn loca_table(&self) -> Result<LocaTable> {
         let record = self
             .get_table_record(b"loca")
@@ -201,7 +325,13 @@ impl Font {
         )
     }
 
-    /// Parse and return the glyf table
+    /// Get the glyf table (glyph data).
+    ///
+    /// The glyf table contains the actual glyph data for each glyph in the font.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `GlyfTable` or an error if the table is missing or invalid.
     pub fn glyf_table(&self) -> Result<GlyfTable> {
         let record = self
             .get_table_record(b"glyf")
@@ -217,7 +347,14 @@ impl Font {
         GlyfTable::from_reader(&mut reader, record.length, &loca, maxp.num_glyphs)
     }
 
-    /// Parse and return the post table
+    /// Get the post table (PostScript information).
+    ///
+    /// The post table contains information about the font's PostScript
+    /// metrics, including the italic angle and underline position.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `PostTable` or an error if the table is missing or invalid.
     pub fn post_table(&self) -> Result<PostTable> {
         let record = self
             .get_table_record(b"post")
@@ -229,7 +366,14 @@ impl Font {
         PostTable::from_reader(&mut reader, record.length)
     }
 
-    /// Parse and return the OS/2 table
+    /// Get the OS/2 table (OS/2 and Windows metrics).
+    ///
+    /// The OS/2 table contains information about the font's OS/2 and
+    /// Windows metrics, including the x-height and cap height.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed `Os2Table` or an error if the table is missing or invalid.
     pub fn os2_table(&self) -> Result<Os2Table> {
         let record = self
             .get_table_record(b"OS/2")
@@ -301,7 +445,23 @@ impl Font {
             .collect()
     }
 
-    /// Save font to a file
+    /// Save the font to a file.
+    ///
+    /// Serializes the font data and writes it to the specified path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Output path for the font file
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ttf_rs::Font;
+    ///
+    /// let font = Font::load("input.ttf")?;
+    /// font.save("output.ttf")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let data = self.to_bytes()?;
         let mut file = File::create(path)?;

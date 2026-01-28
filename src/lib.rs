@@ -7,12 +7,17 @@ mod stream;
 mod modifier;
 mod subset;
 mod validation;
+mod woff;
+mod rasterizer;
+mod cached;
 
 pub use error::{TtfError, Result};
 pub use font::Font;
 pub use modifier::FontModifier;
 pub use subset::FontSubset;
 pub use validation::{ValidationReport, ValidationError, ValidationWarning};
+pub use rasterizer::{Rasterizer, RasterizedGlyph};
+pub use cached::CachedFont;
 pub use stream::{FontReader, FontWriter, calculate_checksum};
 pub use tables::{
     TableRecord,
@@ -20,7 +25,7 @@ pub use tables::{
     TtfTableWrite,
     head::HeadTable,
     maxp::MaxpTable,
-    cmap::CmapTable,
+    cmap::{CmapTable, CmapSubtable},
     name::NameTable,
     hhea::HheaTable,
     hmtx::HmtxTable,
